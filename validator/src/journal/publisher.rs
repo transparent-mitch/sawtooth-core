@@ -470,6 +470,16 @@ impl SyncBlockPublisher {
     }
 
     fn cancel_block(&self, state: &mut BlockPublisherState) {
+        let invalid_batches = if let Some(ref cb) = state.candidate_block {
+            cb.invalid_batches.clone()
+        } else {
+            vec![]
+        };
+
+        // Removing invalid batches from pending_batches
+        state.pending_batches.batches.retain(|ref pb| !invalid_batches.iter().find(|ib|
+            ib.header_signature == pb.header_signature).is_some());
+
         let mut candidate_block = None;
         mem::swap(&mut state.candidate_block, &mut candidate_block);
         if let Some(mut candidate_block) = candidate_block {

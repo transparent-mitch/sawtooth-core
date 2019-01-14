@@ -66,6 +66,7 @@ pub struct CandidateBlock {
     pending_batches: Vec<Batch>,
     pending_batch_ids: HashSet<String>,
     injected_batch_ids: HashSet<String>,
+    pub invalid_batches: Vec<Batch>,
 
     committed_txn_cache: TransactionCommitCache,
 }
@@ -99,6 +100,7 @@ impl CandidateBlock {
             pending_batches: vec![],
             pending_batch_ids: HashSet::new(),
             injected_batch_ids: HashSet::new(),
+            invalid_batches: vec![],
         }
     }
 
@@ -377,11 +379,6 @@ impl CandidateBlock {
         let mut bad_batches = vec![];
         let mut pending_batches = vec![];
 
-        if self.injected_batch_ids == valid_batch_ids {
-            // There only injected batches in this block
-            return Ok(None);
-        }
-
         for batch in self.pending_batches.clone() {
             let header_signature = &batch.header_signature.clone();
             if batch.trace {
@@ -426,10 +423,17 @@ impl CandidateBlock {
                     committed_txn_cache.add_batch(&batch.clone());
                 }
             } else {
+                self.invalid_batches.push(batch.clone());
                 bad_batches.push(batch.clone());
                 debug!("Batch {} invalid, not added to block", header_signature);
             }
         }
+
+        if self.injected_batch_ids == valid_batch_ids {
+            // There only injected batches in this block
+            return Ok(None);
+        }
+
         if execution_results.ending_state_hash.is_none() || self.no_batches_added(&builder) {
             debug!("Abandoning block, no batches added");
             return Ok(None);
